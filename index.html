@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MUNA - Générateur d'Histoires IA</title>
+<style>
+body{font-family:system-ui;background:#0f0a1e;color:#fff;margin:0;padding:12px}
+.card{background:#1e1b2e;border:1px solid #3b3561;border-radius:18px;padding:16px;margin-bottom:14px}
+input,textarea,select{width:100%;background:#0f0a1e;border:1px solid #4b4580;color:#fff;padding:12px;border-radius:10px;margin:6px 0;font-size:15px;box-sizing:border-box}
+button{background:linear-gradient(90deg,#8b5cf6,#ec4899);color:#fff;border:0;padding:14px;border-radius:12px;width:100%;font-weight:800;font-size:16px;margin-top:8px}
+button:disabled{opacity:0.5}
+#roman{white-space:pre-wrap;background:#0f0a1e;padding:16px;border-radius:12px;line-height:1.7;min-height:200px;border:1px dashed #4b4580;font-size:14px}
+small{color:#a89bff}
+.badge{background:#8b5cf6;padding:4px 10px;border-radius:20px;font-size:11px}
+progress{width:100%;height:12px}
+#status{font-weight:700;color:#38bdf8}
+.flex{display:flex;gap:8px}
+.flex>*{flex:1}
+</style>
+</head>
+<body>
+<div class="card">
+<h2>📚 MUNA IA <span class="badge">V3 MULTI-GENRE</span></h2>
+
+<label>🔑 Clé API Groq</label>
+<input id="apiKey" type="text" placeholder="gsk_....">
+<small>Modèle par défaut: openai/gpt-oss-20b (gratuit 2026)</small>
+
+<label>Titre</label>
+<input id="titre" value="L'étrangère de Bertoua">
+
+<label>Genre</label>
+<select id="genre" onchange="adapterGenre()">
+<option value="Roman">Roman</option>
+<option value="Romance dramatique">Romance dramatique</option>
+<option value="Théâtre">Théâtre</option>
+<option value="Nouvelles">Nouvelles (recueil)</option>
+<option value="Poésie">Poésie</option>
+<option value="Aventure africaine">Aventure africaine</option>
+<option value="Thriller">Thriller</option>
+</select>
+
+<div class="flex">
+<div>
+<label id="labelNb">Nombre de chapitres</label>
+<input id="nb" type="number" value="8" min="1" max="30">
+</div>
+<div>
+<label>API Modèle</label>
+<select id="model">
+<option value="openai/gpt-oss-20b" selected>gpt-oss-20b (Rapide/GRATUIT)</option>
+<option value="openai/gpt-oss-120b">gpt-oss-120b (Qualité max)</option>
+<option value="qwen/qwen3-32b">qwen3-32b (Fallback)</option>
+</select>
+</div>
+</div>
+
+<label>Ton idée (2-3 phrases)</label>
+<textarea id="idee" rows="3">Une jeune femme métisse asiatico-afro-américaine, très belle, blonde, grande, avec lunettes, quitte les USA pour retrouver son père biologique à Bertoua.</textarea>
+
+<label>Personnage principal</label>
+<input id="perso" value="Lena, 24 ans, blonde à cheveux longs ondulés, grande, élancée, lunettes, métisse asiatique et africaine-américaine, très belle, intelligente">
+
+<label>Style d'écriture</label>
+<select id="style">
+<option value="Simple et fluide (best-seller)" selected>Simple et fluide (best-seller)</option>
+<option value="Dialogue intense">Dialogue intense - que des dialogues percutants</option>
+<option value="Suspense haletant">Suspense haletant - cliffhanger à chaque fin</option>
+<option value="Poétique et descriptif">Poétique et descriptif - métaphores, nature</option>
+<option value="Enfantin et vibrant d'énergie">Enfantin et vibrant d'énergie - joyeux, simple</option>
+<option value="Émotionnel et intense">Émotionnel et intense</option>
+<option value="Théâtral - didascalies">Théâtral - didascalies et répliques</option>
+</select>
+
+<button id="btnGen" onclick="generer()">✨ GÉNÉRER</button>
+<button onclick="stopper()" style="background:#334155;margin-top:6px">⏹️ Stopper</button>
+<progress id="prog" value="0" max="100" style="display:none"></progress>
+<p id="status">En attente</p>
+<p id="log" style="font-size:11px;color:#64748b"></p>
+</div>
+
+<div class="card">
+<h3 id="titreRoman">Résultat</h3>
+<div id="roman">Ton chef-d'œuvre apparaîtra ici...</div>
+<button onclick="copier()" style="background:#1e1b2e;border:1px solid #4b4580">📋 Copier</button>
+<button onclick="telecharger()" style="background:#22c55e;color:#000">💾 Télécharger .TXT</button>
+<button onclick="whatsapp()" style="background:#25D366">WhatsApp 698973932</button>
+</div>
+
+<script>
+let stop = false;
+function stopper(){stop=true;}
+function adapterGenre(){
+ const g = document.getElementById('genre').value;
+ const label = document.getElementById('labelNb');
+ if(g==='Théâtre') label.innerText='Nombre d\'Actes / Scènes';
+ else if(g==='Poésie') label.innerText='Nombre de poèmes';
+ else if(g==='Nouvelles') label.innerText='Nombre de nouvelles';
+ else label.innerText='Nombre de chapitres';
+}
+
+async function generer(){
+ const apiKey = document.getElementById('apiKey').value.trim();
+ const titre = document.getElementById('titre').value;
+ const genre = document.getElementById('genre').value;
+ const idee = document.getElementById('idee').value;
+ const perso = document.getElementById('perso').value;
+ const nbChap = parseInt(document.getElementById('nb').value);
+ const style = document.getElementById('style').value;
+ const model = document.getElementById('model').value;
+
+ if(!apiKey.startsWith('gsk_')){alert('Clé Groq invalide!');return;}
+ stop=false;
+ document.getElementById('btnGen').disabled=true;
+ document.getElementById('roman').innerText='';
+ document.getElementById('prog').style.display='block';
+ document.getElementById('prog').value=0;
+
+ let romanComplet = `TITRE: ${titre}\nGENRE: ${genre}\nSTYLE: ${style}\nHEROINE: ${perso}\n\n`;
+
+ for(let i=1;i<=nbChap;i++){
+   if(stop) break;
+   document.getElementById('status').innerText = `✍️ ${genre} ${i}/${nbChap}...`;
+   
+   let instructionStructure = '';
+   if(genre==='Théâtre') instructionStructure = `Écris l'ACTE ${i}. Format théâtre: [Didascalies entre crochets], NOM PERSONNAGE: réplique. 800 mots.`;
+   else if(genre==='Poésie') instructionStructure = `Écris le POÈME ${i} sur ${nbChap} du recueil "${titre}". 4 strophes minimum, rimes, style ${style}.`;
+   else if(genre==='Nouvelles') instructionStructure = `Écris la NOUVELLE ${i} sur ${nbChap}, histoire indépendante mais liée au thème global. 900 mots, chute surprenante.`;
+   else instructionStructure = `Écris le CHAPITRE ${i} sur ${nbChap}. 800-1000 mots, descriptions physiques de ${perso}.`;
+
+   let instructionStyle = '';
+   if(style==='Dialogue intense') instructionStyle = '80% de dialogues, phrases courtes, conflit, tension permanente.';
+   if(style==='Suspense haletant') instructionStyle = 'Rythme rapide, finis par un cliffhanger insoutenable. Phrases courtes.';
+   if(style==='Poétique et descriptif') instructionStyle = 'Langage poétique, métaphores sur la savane de Bertoua, lumière, odeurs.';
+   if(style==='Enfantin et vibrant d\'énergie') instructionStyle = 'Vocabulaire simple, phrases exclamatives, joie, énergie, onomatopées!';
+
+   const prompt = `Tu es un auteur expert en ${genre}.
+Titre: "${titre}" | Genre: ${genre} | Style: ${style}
+Synopsis: ${idee}
+Héroïne: ${perso}
+Mission: ${instructionStructure}
+Consigne Style: ${instructionStyle}
+Langue: Français.`;
+
+   try{
+     const res = await fetch('https://api.groq.com/openai/v1/chat/completions',{
+       method:'POST',
+       headers:{'Authorization':'Bearer '+apiKey,'Content-Type':'application/json'},
+       body:JSON.stringify({model:model,messages:[{role:'user',content:prompt}],temperature:0.9,max_tokens:3500})
+     });
+     const data = await res.json();
+     if(data.error){
+       document.getElementById('status').innerText='❌ '+data.error.message;
+       if(data.error.message.includes('rate')){await new Promise(r=>setTimeout(r,20000)); i--; continue;}
+       break;
+     }
+     //let chapitre = data.choices[0].message.content;
+     let chapitre = data.choices[0].message.content || data.choices[0].message.reasoning || "";
+console.log("DEBUG CONTENU:", chapitre);
+if(!chapitre){
+  document.getElementById('log').innerText = "\n[DEBUG] Réponse vide. JSON complet:\n" + JSON.stringify(data).substring(0,500);
+}
+     let separateur = genre==='Théâtre' ? `\n\n=== ACTE ${i} ===\n\n` : genre==='Poésie' ? `\n\n--- Poème ${i} ---\n\n` : `\n\n══════ CHAPITRE ${i} ══════\n\n`;
+     romanComplet += separateur + chapitre;
+     document.getElementById('roman').innerText = romanComplet;
+     document.getElementById('prog').value = (i/nbChap)*100;
+     localStorage.setItem('dernier_roman', romanComplet);
+     await new Promise(r=>setTimeout(r,2000));
+   }catch(e){document.getElementById('status').innerText='❌ '+e.message; break;}
+ }
+ document.getElementById('status').innerText='✅ Terminé!';
+ document.getElementById('prog').style.display='none';
+ document.getElementById('btnGen').disabled=false;
+}
+function copier(){navigator.clipboard.writeText(document.getElementById('roman').innerText);alert('Copié!');}
+function telecharger(){const blob=new Blob([document.getElementById('roman').innerText],{type:'text/plain'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(document.getElementById('titre').value||'roman')+'.txt';a.click();}
+function whatsapp(){let txt=document.getElementById('roman').innerText.substring(0,3000);window.open('https://wa.me/237698973932?text='+encodeURIComponent(txt),'_blank');}
+document.getElementById('apiKey').value=localStorage.getItem('groq_key')||'';
+document.getElementById('apiKey').addEventListener('input',e=>localStorage.setItem('groq_key',e.target.value));
+if(localStorage.getItem('dernier_roman')) document.getElementById('roman').innerText=localStorage.getItem('dernier_roman');
+adapterGenre();
+</script>
+</body>
+</html>
